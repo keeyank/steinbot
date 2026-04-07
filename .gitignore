@@ -1,0 +1,14 @@
+venv/
+.env
+logs/
+uploads/
+__pycache__/
+*.pyc
+*.pyo
+
+# ChromaDB index files (auto-generated, rebuilt on demand)
+chroma_db/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
