@@ -66,18 +66,20 @@ async def upload_book(session_id: str, file: UploadFile = File(...)):
     if not (file.filename.endswith(".epub") or file.filename.endswith(".epub.zip")):
         raise HTTPException(status_code=400, detail="Only .epub files are supported")
 
-    save_path = os.path.join(UPLOAD_DIR, file.filename)
+    # Always save as .epub regardless of whether the browser appended .zip
+    save_name = file.filename.removesuffix(".zip")
+    save_path = os.path.join(UPLOAD_DIR, save_name)
     with open(save_path, "wb") as f:
         while chunk := await file.read(1024 * 1024):
             f.write(chunk)
 
-    logger.debug("Uploaded %s — parsing, indexing, and profiling", file.filename)
+    book_id = save_name
+    logger.info("Uploaded %s — parsing, indexing, and profiling", book_id)
     book_text = parse_epub(save_path)
     load_or_build_index(book_text, save_path)
     generate_profile(book_text, save_path)
-    logger.debug("Indexed and profiled %s", file.filename)
+    logger.debug("Indexed and profiled %s", book_id)
 
-    book_id = file.filename
     return {"book_id": book_id}
 
 
