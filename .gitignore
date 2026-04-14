@@ -9,6 +9,8 @@ __pycache__/
 # ChromaDB index files (auto-generated, rebuilt on demand)
 chroma_db/
 
+TODO.md
+
 # Frontend
 frontend/node_modules/
 frontend/dist/

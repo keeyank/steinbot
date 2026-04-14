@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from bot import ask_llm
 from parser import parse_epub
+from profiler import generate_profile
 from retriever import load_or_build_index, get_relevant_chunks
 
 app = FastAPI()
@@ -70,10 +71,11 @@ async def upload_book(session_id: str, file: UploadFile = File(...)):
         while chunk := await file.read(1024 * 1024):
             f.write(chunk)
 
-    logger.debug("Uploaded %s — parsing and indexing", file.filename)
+    logger.debug("Uploaded %s — parsing, indexing, and profiling", file.filename)
     book_text = parse_epub(save_path)
     load_or_build_index(book_text, save_path)
-    logger.debug("Indexed %s", file.filename)
+    generate_profile(book_text, save_path)
+    logger.debug("Indexed and profiled %s", file.filename)
 
     book_id = file.filename
     return {"book_id": book_id}
@@ -102,16 +104,16 @@ def ask(req: AskRequest):
         session["current_book_id"] = req.book_id
         session["history"] = []
 
-        summary_path = os.path.splitext(epub_path)[0] + ".summary.txt"
-        if os.path.exists(summary_path):
-            with open(summary_path) as f:
-                session["summary"] = f.read()
-            logger.debug("Loaded summary from %s", summary_path)
+        profile_path = os.path.splitext(epub_path)[0] + ".profile.txt"
+        if os.path.exists(profile_path):
+            with open(profile_path) as f:
+                session["profile"] = f.read()
+            logger.debug("Loaded profile from %s", profile_path)
         else:
-            session["summary"] = None
+            session["profile"] = None
 
     chunks = get_relevant_chunks(req.question, epub_path)
-    answer = ask_llm(chunks, req.question, session["history"], session.get("summary"))
+    answer = ask_llm(chunks, req.question, session["history"], session.get("profile"))
 
     logger.debug("[%s] Done", req.session_id[:8])
 

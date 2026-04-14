@@ -41,7 +41,7 @@ passages, let the user know.
 
 """
 
-def ask_llm(chunks: list[str], question: str, history: list[dict], summary: Optional[str] = None) -> str:
+def ask_llm(chunks: list[str], question: str, history: list[dict], profile: Optional[str] = None) -> str:
     context = "\n\n---\n\n".join(chunks)
     # Convert provider-agnostic history dicts to Gemini's Content objects.
     # "assistant" is the canonical role; Gemini calls it "model".
@@ -60,7 +60,7 @@ def ask_llm(chunks: list[str], question: str, history: list[dict], summary: Opti
         contents=contents,
         config=types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT
-            + (f"\n\n# Book Summary\n\n{summary}" if summary else "")
+            + (f"\n\n# Book Profile\n\n{profile}" if profile else "")
             + "\n\n# Relevant Passages\n\n" + context,
         ),
     )
