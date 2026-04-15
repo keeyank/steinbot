@@ -1,6 +1,5 @@
 # Future Updates
 
-- [ ] File upload is broken and needs to be fixed
 - [ ] Restrict CORS to frontend domain before deploying
 - [ ] Support PDF format
 - [ ] Persist conversation history per user (requires auth + database)
