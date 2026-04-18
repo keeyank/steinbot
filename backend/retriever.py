@@ -4,9 +4,12 @@ import os
 import chromadb
 from sentence_transformers import SentenceTransformer
 
+from parser import Section
+
 logger = logging.getLogger("steinbot")
 
-# Index Build Params - if you change these, delete uploads/.index to trigger a rebuild
+# Index Build Params - if you change these (or the chunk metadata schema below),
+# delete uploads/.index to trigger a rebuild.
 CHUNK_WORDS = 750
 OVERLAP_WORDS = 100
 
@@ -22,12 +25,12 @@ def _get_model() -> SentenceTransformer:
     return _model
 
 
-def _chunk_text(chapters: list[str], chunk_words: int = CHUNK_WORDS, overlap_words: int = OVERLAP_WORDS) -> list[dict]:
-    logger.debug("Chunking %d chapters", len(chapters))
+def _chunk_text(sections: list[Section], chunk_words: int = CHUNK_WORDS, overlap_words: int = OVERLAP_WORDS) -> list[dict]:
+    logger.debug("Chunking %d sections", len(sections))
     chunks = []
     global_index = 0
-    for chapter_num, chapter_text in enumerate(chapters):
-        words = chapter_text.split()
+    for section_index, section in enumerate(sections):
+        words = section.text.split()
         start = 0
         while start < len(words):
             end = min(start + chunk_words, len(words))
@@ -35,7 +38,8 @@ def _chunk_text(chapters: list[str], chunk_words: int = CHUNK_WORDS, overlap_wor
                 "text": " ".join(words[start:end]),
                 "chunk_index": global_index,
                 "word_count": len(words[start:end]),
-                "chapter": chapter_num,
+                "section_index": section_index,
+                "section_title": section.title or "",
             })
             global_index += 1
             if end == len(words):
@@ -54,7 +58,7 @@ def _get_client(epub_path: str) -> chromadb.PersistentClient:
     return chromadb.PersistentClient(path=index_dir)
 
 
-def load_or_build_index(book_text: str, epub_path: str) -> None:
+def load_or_build_index(sections: list[Section], epub_path: str) -> None:
     client = _get_client(epub_path)
     name = _collection_name(epub_path)
 
@@ -64,9 +68,17 @@ def load_or_build_index(book_text: str, epub_path: str) -> None:
         return
 
     logger.debug("Building index for '%s'", name)
-    chunks = _chunk_text(book_text)
+    chunks = _chunk_text(sections)
     texts = [c["text"] for c in chunks]
-    metadatas = [{"chunk_index": c["chunk_index"], "word_count": c["word_count"], "chapter": c["chapter"]} for c in chunks]
+    metadatas = [
+        {
+            "chunk_index": c["chunk_index"],
+            "word_count": c["word_count"],
+            "section_index": c["section_index"],
+            "section_title": c["section_title"],
+        }
+        for c in chunks
+    ]
 
     model = _get_model()
     logger.debug("Encoding %d chunks", len(chunks))
@@ -102,6 +114,7 @@ def get_relevant_chunks(question: str, epub_path: str, k: int = TOP_K) -> list[s
 
     formatted = []
     for doc, meta in zip(results["documents"][0], results["metadatas"][0]):
-        prefix = f"[Chapter {meta['chapter']}, passage {meta['chunk_index']}, {meta['word_count']} words]"
+        title = meta["section_title"] or "untitled"
+        prefix = f'[Section {meta["section_index"]}: "{title}", passage {meta["chunk_index"]}, {meta["word_count"]} words]'
         formatted.append(f"{prefix}\n{doc}")
     return formatted

@@ -1,9 +1,23 @@
 import io
+import re
 import zipfile
+from dataclasses import dataclass
 
 import ebooklib
 from ebooklib import epub
 from bs4 import BeautifulSoup
+
+
+@dataclass
+class Section:
+    title: str | None
+    text: str
+
+
+_TITLE_PATTERN = re.compile(
+    r"^\s*(prologue|epilogue|chapter\s+\S+|part\s+\S+|book\s+\S+|introduction|foreword|afterword|preface)\b",
+    re.IGNORECASE,
+)
 
 
 def _strip_zip_prefix(filepath: str) -> None:
@@ -29,15 +43,35 @@ def _strip_zip_prefix(filepath: str) -> None:
         f.write(buf.getvalue())
 
 
-def parse_epub(filepath: str) -> list[str]:
+def _extract_title(soup: BeautifulSoup, text: str) -> str | None:
+    for tag_name in ("h1", "h2"):
+        heading = soup.find(tag_name)
+        if heading:
+            heading_text = heading.get_text(strip=True)
+            if heading_text:
+                return heading_text
+
+    for line in text.split("\n"):
+        line = line.strip()
+        if not line:
+            continue
+        match = _TITLE_PATTERN.match(line)
+        if match:
+            return match.group(0).strip()
+        return None
+    return None
+
+
+def parse_epub(filepath: str) -> list[Section]:
     _strip_zip_prefix(filepath)
     book = epub.read_epub(filepath)
-    chapters = []
+    sections: list[Section] = []
 
     for item in book.get_items_of_type(ebooklib.ITEM_DOCUMENT):
         soup = BeautifulSoup(item.get_content(), "html.parser")
         text = soup.get_text(separator="\n", strip=True)
         if text:
-            chapters.append(text)
+            title = _extract_title(soup, text)
+            sections.append(Section(title=title, text=text))
 
-    return chapters
+    return sections

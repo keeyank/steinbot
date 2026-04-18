@@ -6,6 +6,8 @@ from google import genai
 from google.genai import types
 from google.genai.errors import ClientError
 
+from parser import Section
+
 logger = logging.getLogger("steinbot")
 
 _MAX_CHUNK_CHARS = 200_000   # ~50k tokens at 4 chars/token
@@ -75,7 +77,7 @@ def _split_chunks(text: str) -> list[str]:
     return [text[i : i + _MAX_CHUNK_CHARS] for i in range(0, len(text), _MAX_CHUNK_CHARS)]
 
 
-def generate_profile(book_text: list[str], epub_path: str) -> str:
+def generate_profile(sections: list[Section], epub_path: str) -> str:
     profile_path = os.path.splitext(epub_path)[0] + ".profile.txt"
 
     if os.path.exists(profile_path):
@@ -84,7 +86,10 @@ def generate_profile(book_text: list[str], epub_path: str) -> str:
             return f.read()
 
     logger.debug("Generating profile for %s", epub_path)
-    full_text = "\n\n".join(book_text)
+    full_text = "\n\n".join(
+        f"## {s.title}\n\n{s.text}" if s.title else s.text
+        for s in sections
+    )
     client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
     chunks = _split_chunks(full_text)
     n = len(chunks)

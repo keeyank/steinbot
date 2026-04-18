@@ -2,7 +2,7 @@ import logging
 import os
 import sys
 from datetime import datetime
-from parser import parse_epub
+from parser import Section, parse_epub
 from retriever import load_or_build_index, get_relevant_chunks
 
 
@@ -17,9 +17,9 @@ def main():
         sys.exit(1)
 
     print(f"Parsing {epub_path}...")
-    book_text = parse_epub(epub_path)
-    print(f"Loaded {sum(len(c) for c in book_text):,} characters.")
-    load_or_build_index(book_text, epub_path)
+    sections: list[Section] = parse_epub(epub_path)
+    print(f"Loaded {sum(len(s.text) for s in sections):,} characters across {len(sections)} sections.")
+    load_or_build_index(sections, epub_path)
 
     summary_path = os.path.splitext(epub_path)[0] + ".summary.txt"
     if os.path.exists(summary_path):

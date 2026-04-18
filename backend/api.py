@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from bot import ask_llm
-from parser import parse_epub
+from parser import Section, parse_epub
 from profiler import generate_profile
 from retriever import load_or_build_index, get_relevant_chunks
 
@@ -75,9 +75,9 @@ async def upload_book(session_id: str, file: UploadFile = File(...)):
 
     book_id = save_name
     logger.info("Uploaded %s — parsing, indexing, and profiling", book_id)
-    book_text = parse_epub(save_path)
-    load_or_build_index(book_text, save_path)
-    generate_profile(book_text, save_path)
+    sections: list[Section] = parse_epub(save_path)
+    load_or_build_index(sections, save_path)
+    generate_profile(sections, save_path)
     logger.debug("Indexed and profiled %s", book_id)
 
     return {"book_id": book_id}

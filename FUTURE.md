@@ -4,6 +4,8 @@
 - [ ] Support PDF format
 - [ ] Persist conversation history per user (requires auth + database)
 - [ ] Display nicer book names
+- [ ] Fix
+- [ ] Remove spoilers from auto-generated book profile, add positional anchors (see primer below)
 
 ## Book Identity and Storage
 
@@ -14,6 +16,16 @@ Currently the uploaded filename doubles as the book's unique ID. This breaks wit
 The catch: once ID and filename are decoupled, the display name has to live somewhere. Right now `GET /books` derives names by scanning filenames on disk — that no longer works. This is the natural forcing function for introducing a lightweight database (SQLite would be enough), with a `books` table: `(id TEXT, filename TEXT, display_name TEXT)`.
 
 **When to implement:** when the filename-collision problem actually bites, or when the database is added for conversation history persistence (see below).
+
+## Spoilers in the Book Profile
+
+The auto-generated book profile is passed to the LLM as context on every question and contains the full plot, including late-book events. Because the assistant has no notion of where the user is in the book, it readily volunteers spoilers in ordinary answers.
+
+**Example.** Early in a first read of *Shōgun*, asking "who is Mariko again?" currently yields a response that reveals her death in chapter 70 and its role in Toranaga's endgame — not what a reader on chapter 10 wants.
+
+**Fix direction:** restructure the profile so each character and event is split into *setup* (safe to share on introduction) and *arc/fate* (gated by reading position), and tag events with rough positional anchors (part or chapter ranges). The assistant answers from the setup layer by default, only drawing on later material when the user's question clearly references something already read. Positional anchors also unlock "where was X introduced?" questions, which the profile currently can't answer at all.
+
+**When to implement:** next — this is the most visible quality problem with the current profile.
 
 # Future Considerations
 
