@@ -44,6 +44,7 @@ def _strip_zip_prefix(filepath: str) -> None:
 
 
 def _extract_title(soup: BeautifulSoup, text: str) -> str | None:
+    # Preferred: well-formed EPUBs put the chapter title in an <h1> or <h2> tag.
     for tag_name in ("h1", "h2"):
         heading = soup.find(tag_name)
         if heading:
@@ -51,6 +52,10 @@ def _extract_title(soup: BeautifulSoup, text: str) -> str | None:
             if heading_text:
                 return heading_text
 
+    # Fallback: no heading tag, so treat the document as titled only if its
+    # first non-empty line itself looks like "Chapter X" / "Prologue" / etc.
+    # We deliberately stop at the first non-empty line — if the doc doesn't
+    # *start* with a heading-shaped line, it isn't a titled section.
     for line in text.split("\n"):
         line = line.strip()
         if not line:

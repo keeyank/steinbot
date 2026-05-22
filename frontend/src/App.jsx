@@ -77,7 +77,7 @@ export default function App() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <select value={selectedBook} onChange={e => setSelectedBook(e.target.value)}>
                 {books.map(b => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
+                  <option key={b.id} value={b.id}>{b.title}</option>
                 ))}
               </select>
               <input

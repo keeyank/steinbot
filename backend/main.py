@@ -3,7 +3,8 @@ import os
 import sys
 from datetime import datetime
 from parser import Section, parse_epub
-from retriever import load_or_build_index, get_relevant_chunks
+from profiler import generate_profile
+from retriever import get_relevant_chunks, load_or_build_index
 
 
 def main():
@@ -19,15 +20,22 @@ def main():
     print(f"Parsing {epub_path}...")
     sections: list[Section] = parse_epub(epub_path)
     print(f"Loaded {sum(len(s.text) for s in sections):,} characters across {len(sections)} sections.")
-    load_or_build_index(sections, epub_path)
 
-    summary_path = os.path.splitext(epub_path)[0] + ".summary.txt"
-    if os.path.exists(summary_path):
-        with open(summary_path) as f:
-            summary = f.read()
-        print(f"Loaded summary from {summary_path}")
+    index_dir = os.path.join(os.path.dirname(os.path.abspath(epub_path)), ".index")
+    collection_name = os.path.splitext(os.path.basename(epub_path))[0].replace(" ", "_")
+    load_or_build_index(sections, index_dir=index_dir, collection_name=collection_name)
+
+    profile_path = os.path.splitext(epub_path)[0] + ".profile.txt"
+    if os.path.exists(profile_path):
+        with open(profile_path) as f:
+            profile = f.read()
+        print(f"Loaded profile from {profile_path}")
     else:
-        summary = None
+        print("Generating profile...")
+        profile = generate_profile(sections)
+        with open(profile_path, "w") as f:
+            f.write(profile)
+        print(f"Wrote profile to {profile_path}")
 
     book_name = os.path.splitext(os.path.basename(epub_path))[0]
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -56,9 +64,9 @@ def main():
             print("Goodbye.")
             break
 
-        chunks = get_relevant_chunks(question, epub_path)
+        chunks = get_relevant_chunks(question, index_dir=index_dir, collection_name=collection_name)
         print("Steinbot: ", end="", flush=True)
-        answer = ask_llm(chunks, question, history, summary)
+        answer = ask_llm(chunks, question, history, profile)
         print(answer)
         print()
 

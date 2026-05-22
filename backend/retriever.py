@@ -1,5 +1,4 @@
 import logging
-import os
 
 import chromadb
 from sentence_transformers import SentenceTransformer
@@ -9,7 +8,7 @@ from parser import Section
 logger = logging.getLogger("steinbot")
 
 # Index Build Params - if you change these (or the chunk metadata schema below),
-# delete uploads/.index to trigger a rebuild.
+# delete the .index directory to trigger a rebuild.
 CHUNK_WORDS = 750
 OVERLAP_WORDS = 100
 
@@ -49,25 +48,15 @@ def _chunk_text(sections: list[Section], chunk_words: int = CHUNK_WORDS, overlap
     return chunks
 
 
-def _collection_name(epub_path: str) -> str:
-    return os.path.splitext(os.path.basename(epub_path))[0].replace(" ", "_")
-
-
-def _get_client(epub_path: str) -> chromadb.PersistentClient:
-    index_dir = os.path.join(os.path.dirname(os.path.abspath(epub_path)), ".index")
-    return chromadb.PersistentClient(path=index_dir)
-
-
-def load_or_build_index(sections: list[Section], epub_path: str) -> None:
-    client = _get_client(epub_path)
-    name = _collection_name(epub_path)
+def load_or_build_index(sections: list[Section], *, index_dir: str, collection_name: str) -> None:
+    client = chromadb.PersistentClient(path=index_dir)
 
     existing = [c.name for c in client.list_collections()]
-    if name in existing:
-        logger.debug("Index already exists for '%s', skipping build", name)
+    if collection_name in existing:
+        logger.debug("Index already exists for '%s', skipping build", collection_name)
         return
 
-    logger.debug("Building index for '%s'", name)
+    logger.debug("Building index for '%s'", collection_name)
     chunks = _chunk_text(sections)
     texts = [c["text"] for c in chunks]
     metadatas = [
@@ -85,7 +74,7 @@ def load_or_build_index(sections: list[Section], epub_path: str) -> None:
     embeddings = model.encode(texts, show_progress_bar=False).tolist()
 
     logger.debug("Writing index to ChromaDB")
-    collection = client.create_collection(name)
+    collection = client.create_collection(collection_name)
     collection.add(
         ids=[str(i) for i in range(len(chunks))],
         documents=texts,
@@ -95,10 +84,16 @@ def load_or_build_index(sections: list[Section], epub_path: str) -> None:
     logger.debug("Index built — %d chunks stored", len(chunks))
 
 
-def get_relevant_chunks(question: str, epub_path: str, k: int = TOP_K) -> list[str]:
-    client = _get_client(epub_path)
-    name = _collection_name(epub_path)
-    collection = client.get_collection(name)
+def drop_index(*, index_dir: str, collection_name: str) -> None:
+    client = chromadb.PersistentClient(path=index_dir)
+    if any(c.name == collection_name for c in client.list_collections()):
+        client.delete_collection(collection_name)
+        logger.debug("Dropped collection '%s'", collection_name)
+
+
+def get_relevant_chunks(question: str, *, index_dir: str, collection_name: str, k: int = TOP_K) -> list[str]:
+    client = chromadb.PersistentClient(path=index_dir)
+    collection = client.get_collection(collection_name)
 
     model = _get_model()
     logger.debug("Encoding question for retrieval")
